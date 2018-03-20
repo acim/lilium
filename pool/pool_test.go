@@ -1,14 +1,15 @@
-package main
+package pool_test
 
 import (
 	"fmt"
 	"math/rand"
+	"testing"
 	"time"
 
 	"github.com/acim/lilium/pool"
 )
 
-func main() {
+func Test(t *testing.T) {
 	pool := pool.New(nodes())
 	pool.Run()
 	for i := 0; i < 10; i++ {
@@ -32,14 +33,6 @@ func nodes() []pool.Node {
 		pool.Node{Scheme: "http", Host: "127.0.0.3"},
 	}
 }
-
-// func nodesStatus() map[pool.Node]bool {
-// 	return map[pool.Node]bool{
-// 		pool.Node{Scheme: "http", Host: "127.0.0.1"}: true,
-// 		pool.Node{Scheme: "http", Host: "127.0.0.2"}: false,
-// 		pool.Node{Scheme: "http", Host: "127.0.0.3"}: true,
-// 	}
-// }
 
 func nodesStatus() map[pool.Node]bool {
 	status := map[pool.Node]bool{}

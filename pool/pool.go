@@ -22,7 +22,7 @@ type Pool struct {
 func New(nodes []Node) *Pool {
 	p := &Pool{
 		In:      make(chan map[Node]bool, 1),
-		Out:     make(chan Node, 1),
+		Out:     make(chan Node),
 		status:  map[Node]bool{},
 		nodes:   nodes,
 		current: 0,
