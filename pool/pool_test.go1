@@ -1,0 +1,79 @@
+package pool_test
+
+import (
+	"math"
+	"net/url"
+	"testing"
+
+	"it-agenten.com/billiger.de/iapi/backend/cluster/pool"
+)
+
+func TestEmptyPool(t *testing.T) {
+	p, err := pool.New([]url.URL{}, pool.Random)
+	if err != nil {
+		t.Error(err)
+	}
+
+	_, err = p.GetNode()
+	if err == nil {
+		t.Errorf("should get error")
+	}
+}
+
+func TestRandomPool(t *testing.T) {
+	testDistribution(t, pool.Random)
+}
+
+func TestRoundRobinPool(t *testing.T) {
+	testDistribution(t, pool.RoundRobin)
+}
+
+func testDistribution(t *testing.T, pp pool.PoolingPolicy) {
+	ns := nodes()
+	p, err := pool.New(ns, pp)
+	if err != nil {
+		t.Error(err)
+	}
+
+	distribution := map[string]int{
+		"127.0.0.1": 0,
+		"127.0.0.2": 0,
+		"127.0.0.3": 0,
+	}
+
+	loop := 100
+
+	for i := 0; i <= loop; i++ {
+		node, err := p.GetNode()
+		if err != nil {
+			t.Error(err)
+		}
+
+		distribution[node.Host]++
+		found := false
+		for _, n := range ns {
+			if n == node {
+				found = true
+			}
+		}
+
+		if !found {
+			t.Errorf("node %s not found", node.Host)
+		}
+	}
+
+	m := int(loop / len(ns))
+	for j, d := range distribution {
+		if math.Abs(float64(d-m)) > math.Round(float64(loop/len(ns))) {
+			t.Errorf("deviation too large: host %s count %d mean %d", j, d, m)
+		}
+	}
+}
+
+func nodes() []url.URL {
+	return []url.URL{
+		url.URL{Scheme: "http", Host: "127.0.0.1"},
+		url.URL{Scheme: "http", Host: "127.0.0.2"},
+		url.URL{Scheme: "http", Host: "127.0.0.3"},
+	}
+}
