@@ -1,20 +1,30 @@
-package main
+package pool
 
 import (
-	"fmt"
 	"net/url"
 	"sync"
-	"time"
 )
 
+// Node is a type alias for url.URL.
+type Node = url.URL
+
+// Pool represents pool data structure.
+type Pool struct {
+	In      chan map[Node]bool
+	Out     chan Node
+	status  map[Node]bool
+	nodes   []Node
+	once    sync.Once
+	current int
+}
+
 // New returns a pool with requested selection policy.
-func new(nodes []url.URL) *pool {
-	p := &pool{
-		in:      make(chan map[url.URL]bool),
-		out:     make(chan url.URL),
-		status:  map[url.URL]bool{},
+func New(nodes []Node) *Pool {
+	p := &Pool{
+		In:      make(chan map[Node]bool, 1),
+		Out:     make(chan Node, 1),
+		status:  map[Node]bool{},
 		nodes:   nodes,
-		done:    make(chan struct{}),
 		current: 0,
 	}
 	for _, node := range nodes {
@@ -23,38 +33,25 @@ func new(nodes []url.URL) *pool {
 	return p
 }
 
-type pool struct {
-	in      chan map[url.URL]bool
-	out     chan url.URL
-	status  map[url.URL]bool
-	nodes   []url.URL
-	done    chan struct{}
-	once    sync.Once
-	current int
-}
-
-func (p *pool) run() {
+// Run takes care of nodes status updates and nodes delivery.
+func (p *Pool) Run() {
 	p.once.Do(func() {
 		go func() {
 			for {
 				select {
-				case newStatus := <-p.in:
-					p.nodes = make([]url.URL, 0, len(newStatus))
-					i := 0
+				case newStatus := <-p.In:
+					p.nodes = make([]Node, 0, len(newStatus))
 					for node, status := range newStatus {
 						p.status[node] = status
 						if status {
 							p.nodes = append(p.nodes, node)
-							i++
 						}
 					}
-				case <-p.done:
-					return
 				default:
-					if p.current == len(p.nodes) {
+					if p.current >= len(p.nodes) {
 						p.current = 0
 					}
-					p.out <- p.nodes[p.current]
+					p.Out <- p.nodes[p.current]
 					p.current++
 				}
 			}
@@ -62,32 +59,15 @@ func (p *pool) run() {
 	})
 }
 
-func main() {
-	pool := new(nodes())
-	pool.run()
-	for i := 0; i < 10; i++ {
-		node := <-pool.out
-		fmt.Printf("%d: %s\n", i, node.String())
-	}
-	pool.in <- map[url.URL]bool{
-		url.URL{Scheme: "http", Host: "127.0.0.1"}: true,
-		url.URL{Scheme: "http", Host: "127.0.0.2"}: true,
-		url.URL{Scheme: "http", Host: "127.0.0.3"}: false,
-	}
-	for i := 0; i < 10; i++ {
-		node := <-pool.out
-		fmt.Printf("%d: %s\n", i, node.String())
-	}
-	time.Sleep(5 * time.Second)
-}
+// Get returns next available node.
+// func (p *Pool) Get() <-chan Node {
+// 	return p.out
+// }
 
-func nodes() []url.URL {
-	return []url.URL{
-		url.URL{Scheme: "http", Host: "127.0.0.1"},
-		url.URL{Scheme: "http", Host: "127.0.0.2"},
-		url.URL{Scheme: "http", Host: "127.0.0.3"},
-	}
-}
+// Update updates status of the existing nodes.
+// func (p *Pool) Update() chan<- map[Node]bool {
+// 	return p.in
+// }
 
 // // GetNode returns node from the pool using round-robin algorithm.
 // func (p *RoundRobinPool) GetNode() (url.URL, error) {

@@ -1,2 +1,3 @@
 # lilium
-Client side load balancing in Go (Golang) using channels
+
+Client side HTTP load balancing in Go (Golang) using channels
