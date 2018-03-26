@@ -1,8 +1,10 @@
 package pool
 
 import (
+	"fmt"
 	"net/url"
 	"sync"
+	"time"
 )
 
 // Node is a type alias for url.URL.
@@ -10,21 +12,21 @@ type Node = url.URL
 
 // Pool represents pool data structure.
 type Pool struct {
-	In      chan map[Node]bool
-	Out     chan Node
+	req     chan chan Node
 	status  map[Node]bool
 	nodes   []Node
 	once    sync.Once
+	done    chan struct{}
 	current int
 }
 
 // New returns a pool with requested selection policy.
 func New(nodes []Node) *Pool {
 	p := &Pool{
-		In:      make(chan map[Node]bool, 1),
-		Out:     make(chan Node),
+		req:     make(chan chan Node),
 		status:  map[Node]bool{},
 		nodes:   nodes,
+		done:    make(chan struct{}),
 		current: 0,
 	}
 	for _, node := range nodes {
@@ -33,26 +35,23 @@ func New(nodes []Node) *Pool {
 	return p
 }
 
-// Run takes care of nodes status updates and nodes delivery.
-func (p *Pool) Run() {
+// Start takes care of nodes status updates and nodes delivery.
+func (p *Pool) Start(interval time.Duration) {
 	p.once.Do(func() {
+		tick := time.NewTicker(interval)
 		go func() {
 			for {
 				select {
-				case newStatus := <-p.In:
-					p.nodes = make([]Node, 0, len(newStatus))
-					for node, status := range newStatus {
-						p.status[node] = status
-						if status {
-							p.nodes = append(p.nodes, node)
-						}
-					}
-				default:
+				case res := <-p.req:
 					if p.current >= len(p.nodes) {
 						p.current = 0
 					}
-					p.Out <- p.nodes[p.current]
+					res <- p.nodes[p.current]
 					p.current++
+				case t := <-tick.C:
+					fmt.Printf("UPDATE STATUS %s\n", t.String())
+				case <-p.done:
+					return
 				}
 			}
 		}()
@@ -60,62 +59,16 @@ func (p *Pool) Run() {
 }
 
 // Get returns next available node.
-// func (p *Pool) Get() <-chan Node {
-// 	return p.out
-// }
+func (p *Pool) Get() Node {
+	res := make(chan Node)
+	p.req <- res
+	return <-res
+}
 
-// Update updates status of the existing nodes.
-// func (p *Pool) Update() chan<- map[Node]bool {
-// 	return p.in
-// }
-
-// // GetNode returns node from the pool using round-robin algorithm.
-// func (p *RoundRobinPool) GetNode() (url.URL, error) {
-// 	p.Lock()
-// 	defer p.Unlock()
-
-// 	if len(p.nodes) == 0 {
-// 		return url.URL{}, fmt.Errorf("no nodes in the pool")
-// 	}
-
-// 	if p.current == len(p.nodes) {
-// 		p.current = 0
-// 	}
-
-// 	result := p.nodes[p.current]
-// 	p.current++
-// 	return result, nil
-// }
-
-// // RunStatusUpdate starts goroutine to update nodes status
-// func (p *basePool) RunStatusUpdate(interval time.Duration) {
-// 	p.once = sync.Once{}
-// 	p.once.Do(func() {
-// 		p.logger.Debug("status update", "interval", interval.String())
-// 		go func() {
-// 			t := time.Tick(interval)
-
-// 			for now := range t {
-// 				p.logger.Debug("status update", "time", now.String())
-
-// 				node, err := p.GetNode()
-// 				if err != nil {
-// 					p.logger.Warn("status update", "GetNode error", err)
-// 				}
-
-// 				ns, err := f(node)
-// 				if err != nil {
-// 					p.logger.Warn("status update", "get status update error", err)
-// 				}
-
-// 				err = p.UpdateStatus(ns)
-// 				if err != nil {
-// 					p.logger.Warn("status update", "error updating status", err)
-// 				}
-// 			}
-// 		}()
-// 	})
-// }
+// Stop stops pool functionality.
+func (p *Pool) Stop() {
+	p.done <- struct{}{}
+}
 
 // func (p *basePool) UpdateStatus(ns *map[url.URL]bool) error {
 // 	for n, newStatus := range *ns {

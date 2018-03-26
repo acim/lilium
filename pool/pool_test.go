@@ -10,20 +10,20 @@ import (
 )
 
 func Test(t *testing.T) {
-	pool := pool.New(nodes())
-	pool.Run()
+	p := pool.New(nodes())
+	p.Start(1 * time.Second)
+	time.Sleep(3 * time.Second)
 	for i := 0; i < 10; i++ {
-		node := <-pool.Out
+		node := p.Get()
 		fmt.Printf("%d: %s\n", i, node.String())
 	}
-	time.Sleep(2 * time.Second)
-	pool.In <- nodesStatus()
-	time.Sleep(2 * time.Second)
+	time.Sleep(3 * time.Second)
 	for i := 0; i < 10; i++ {
-		node := <-pool.Out
+		node := p.Get()
 		fmt.Printf("%d: %s\n", i, node.String())
 	}
-	time.Sleep(2 * time.Second)
+	time.Sleep(20 * time.Second)
+	p.Stop()
 }
 
 func nodes() []pool.Node {
