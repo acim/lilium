@@ -12,17 +12,23 @@ import (
 func Test(t *testing.T) {
 	p := pool.New(nodes())
 	p.Start(1 * time.Second)
-	time.Sleep(3 * time.Second)
+
 	for i := 0; i < 10; i++ {
-		node := p.Get()
-		fmt.Printf("%d: %s\n", i, node.String())
+		go func(i int) {
+			node := p.Get()
+			fmt.Printf("%d: %s\n", i, node.String())
+		}(i)
 	}
-	time.Sleep(3 * time.Second)
+	time.Sleep(2 * time.Second)
+
 	for i := 0; i < 10; i++ {
-		node := p.Get()
-		fmt.Printf("%d: %s\n", i, node.String())
+		go func(i int) {
+			node := p.Get()
+			fmt.Printf("%d: %s\n", i, node.String())
+		}(i)
 	}
-	time.Sleep(20 * time.Second)
+
+	time.Sleep(5 * time.Second)
 	p.Stop()
 }
 

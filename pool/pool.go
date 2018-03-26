@@ -12,7 +12,7 @@ type Node = url.URL
 
 // Pool represents pool data structure.
 type Pool struct {
-	req     chan chan Node
+	Req     chan chan Node
 	status  map[Node]bool
 	nodes   []Node
 	once    sync.Once
@@ -23,7 +23,7 @@ type Pool struct {
 // New returns a pool with requested selection policy.
 func New(nodes []Node) *Pool {
 	p := &Pool{
-		req:     make(chan chan Node),
+		Req:     make(chan chan Node),
 		status:  map[Node]bool{},
 		nodes:   nodes,
 		done:    make(chan struct{}),
@@ -42,7 +42,7 @@ func (p *Pool) Start(interval time.Duration) {
 		go func() {
 			for {
 				select {
-				case res := <-p.req:
+				case res := <-p.Req:
 					if p.current >= len(p.nodes) {
 						p.current = 0
 					}
@@ -61,7 +61,7 @@ func (p *Pool) Start(interval time.Duration) {
 // Get returns next available node.
 func (p *Pool) Get() Node {
 	res := make(chan Node)
-	p.req <- res
+	p.Req <- res
 	return <-res
 }
 
