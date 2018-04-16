@@ -2,7 +2,6 @@
 	// See http://go.microsoft.com/fwlink/?LinkId=827846
 	// for the documentation about the extensions.json format
 	"recommendations": [
-		"bungcip.better-toml",
 		"codezombiech.gitignore",
 		"DavidAnson.vscode-markdownlint",
 		"donjayamanne.githistory",
